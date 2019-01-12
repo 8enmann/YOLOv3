@@ -135,7 +135,7 @@ def detect_video(video, yolo, all_classes):
 
     vout.release()
     camera.release()
-    
+
 
 if __name__ == '__main__':
     yolo = YOLO(0.6, 0.5)
@@ -152,6 +152,6 @@ if __name__ == '__main__':
                 image = detect_image(image, yolo, all_classes)
                 cv2.imwrite('images/res/' + f, image)
 
-    # detect videos one at a time in videos/test folder    
-    video = 'library1.mp4'
-    detect_video(video, yolo, all_classes)
+    # detect videos one at a time in videos/test folder
+    # video = 'library1.mp4'
+    # detect_video(video, yolo, all_classes)
