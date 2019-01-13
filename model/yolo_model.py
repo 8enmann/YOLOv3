@@ -1,8 +1,12 @@
 """YOLO v3 output
 """
 import numpy as np
+import tensorflow as tf
 import keras.backend as K
 from keras.models import load_model
+import math
+import cv2
+import time
 
 
 class YOLO:
@@ -15,7 +19,8 @@ class YOLO:
         """
         self._t1 = obj_threshold
         self._t2 = nms_threshold
-        self._yolo = load_model('data/yolo.h5')
+        #self._yolo = load_model('data/yolo.h5')
+        self._yolo = load_model('uploads/yolo.h5')
 
     def _sigmoid(self, x):
         """sigmoid.
@@ -204,7 +209,95 @@ class YOLO:
             scores: ndarray, scores of objects.
         """
 
-        outs = self._yolo.predict(image)
-        boxes, classes, scores = self._yolo_out(outs, shape)
+        with graph.as_default():
+            outs = self._yolo.predict(image)
+            boxes, classes, scores = self._yolo_out(outs, shape)
 
-        return boxes, classes, scores
+            return boxes, classes, scores
+
+# Keras stuff
+global graph
+graph = tf.get_default_graph()
+yolo = YOLO(0.6, 0.5)
+
+def draw(image, boxes, scores, classes):
+    """Draw the boxes on the image.
+
+    # Argument:
+        image: original image.
+        boxes: ndarray, boxes of objects.
+        classes: ndarray, classes of objects.
+        scores: ndarray, scores of objects.
+        all_classes: all classes name.
+    """
+    ret = []
+    for box, score, cl in zip(boxes, scores, classes):
+        x, y, w, h = box
+
+        top = max(0, np.floor(x + 0.5).astype(int))
+        left = max(0, np.floor(y + 0.5).astype(int))
+        right = min(image.shape[1], np.floor(x + w + 0.5).astype(int))
+        bottom = min(image.shape[0], np.floor(y + h + 0.5).astype(int))
+
+        #print(top, left, right, bottom, score, cl)
+        # HACK HACK HACK swap x and y to make the frontend work
+        ret.append({
+            "y0": x + w / 2,
+            "x0": y + h / 2,
+            "radius": (w + h) / 4,
+        })
+    return ret
+
+
+
+def process_image(img):
+    """Resize, reduce and expand image.
+
+    # Argument:
+        img: original image.
+
+    # Returns
+        image: ndarray(64, 64, 3), processed image.
+    """
+    image = cv2.resize(img, (416, 416),
+                       interpolation=cv2.INTER_CUBIC)
+    image = np.array(image, dtype='float32')
+    image /= 255.
+    image = np.expand_dims(image, axis=0)
+
+    return image
+
+def detect_image(image, yolo):
+    """Use yolo v3 to detect images.
+
+    # Argument:
+        image: original image.
+        yolo: YOLO, yolo model.
+
+    # Returns:
+        image: processed image.
+    """
+    pimage = process_image(image)
+
+    start = time.time()
+    boxes, classes, scores = yolo.predict(pimage, image.shape)
+    end = time.time()
+
+    print('time: {0:.2f}s'.format(end - start))
+
+
+    if boxes is not None:
+        circles = draw(image, boxes, scores, classes)
+        return circles
+
+
+
+def run(image):
+    circles = detect_image(image, yolo)
+    return {"circles": circles}
+
+
+
+if __name__ == '__main__':
+    image = cv2.imread('test.jpg')
+    print(run(image))
